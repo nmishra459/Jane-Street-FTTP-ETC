@@ -14,22 +14,20 @@ import json
 team_name="psyduck"
 # This variable dictates whether or not the bot is connecting to the prod
 # or test exchange. Be careful with this switch!
-test_mode = True
-
+test_mode = False
 num_order = 0
-orders = []
-
 # This setting changes which test exchange is connected to.
 # 0 is prod-like
 # 1 is slower
 # 2 is empty
-test_exchange_index=0
+test_exchange_index=1
 prod_exchange_hostname="production"
 
 port=25000 + (test_exchange_index if test_mode else 0)
 exchange_hostname = "test-exch-" + team_name if test_mode else prod_exchange_hostname
 # exchange_hostname = 'test-exch-psyduck 20001'
 # port = 25001
+
 positions = {'BOND': 0, 'VALBZ': 0, 'VALE': 0, 'GS': 0, 'MS': 0, 'WFC': 0, 'XLF': 0}
 
 # ~~~~~============== NETWORKING CODE ==============~~~~~
@@ -47,13 +45,13 @@ def read_from_exchange(exchange):
 
 def bondProcesses(exchange):
     global num_order
-    global orders
     num_order+=1
     write_to_exchange(exchange, {"type": "add", "order_id": num_order, "symbol": "BOND", "dir": "SELL", "price": 1002, "size": 50})
-    orders.append(num_order)
     num_order+=1
     write_to_exchange(exchange, {"type": "add", "order_id": num_order, "symbol": "BOND", "dir": "BUY", "price": 998, "size": 50})
-    orders.append(num_order)
+
+
+# ~~~~~============== MAIN LOOP ==============~~~~~
 
 def main():
     exchange = connect()
@@ -69,25 +67,15 @@ def main():
         if(message["type"] == "close"):
             print("The round has ended")
             break
-        elif message['type']=='fill':
-            global num_order
+        elif (message["type"] == "fill"):
             global positions
-            symbol = message['symbol']
-            size = message['size']
-            direction = message['dir']
-            if direction == 'BUY':
+            direction = message["dir"]
+            symbol = message["symbol"]
+            size = message["size"]
+            if (direction == "BUY"):
                 positions[symbol] += size
-            elif direction == 'SELL':
+            else:
                 positions[symbol] -= size
-
-            if symbol == 'VALBZ' or symbol == 'VALE':
-                if positions[symbol] >= 10:
-                    if symbol == 'VALBZ':
-                        num_order += 1
-                        write_to_exchange(exchange, {"type": "convert", "order_id": num_order, "symbol": symbol, "dir": "BUY", "size": 10-positions['VALE']})
-                    elif symbol == "VALE":
-                        num_order += 1
-                        write_to_exchange(exchange, {"type": "convert", "order_id": num_order, "symbol": symbol, "dir": "BUY", "size": 10-positions['VALBZ']})
         elif message["type"]=="BOOK" or message["type"]=="book":
             if(message["symbol"] == "BOND"):
                 bondProcesses(exchange)
@@ -107,19 +95,15 @@ def main():
                 ask_volume = sell[0][1]
                 fair_price = (bid_price + ask_price) / 2
 
+                if (positions[symbol] > 15 or positions[symbol] < -15):
+                    continue
 
-                if (ask_price - bid_price >= 4):
-                    global orders
-                    for i in range(len(orders)):
-                        write_to_exchange(exchange, {"type": "cancel", "order_id": orders[i]})
-                       #  print("Hell owlrd")
+                if (ask_price - bid_price >= 6):
                     global num_order
                     num_order += 1
                     write_to_exchange(exchange, {"type": "add", "order_id": num_order, "symbol": symbol, "dir": "BUY", "price": (bid_price + 1), "size": 10})
-                    orders.append(num_order)
                     num_order += 1
                     write_to_exchange(exchange, {"type": "add", "order_id": num_order, "symbol": symbol, "dir": "SELL", "price": (ask_price - 1), "size": 10})
-                    orders.append(num_order)
 
 if __name__ == "__main__":
     main()
