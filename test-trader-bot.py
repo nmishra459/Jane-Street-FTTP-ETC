@@ -111,7 +111,6 @@ def main():
                     global orders
                     for i in range(len(orders)):
                         write_to_exchange(exchange, {"type": "cancel", "order_id": orders[i]})
-                       #  print("Hell owlrd")
                     global num_order
                     num_order += 1
                     write_to_exchange(exchange, {"type": "add", "order_id": num_order, "symbol": symbol, "dir": "BUY", "price": (bid_price + 1), "size": 10})
