@@ -1,5 +1,3 @@
-#!/usr/bin/python
-
 # ~~~~~==============   HOW TO RUN   ==============~~~~~
 # 1) Configure things in CONFIGURATION section
 # 2) Change permissions: chmod +x bot.py
@@ -12,11 +10,14 @@ import socket
 import json
 
 # ~~~~~============== CONFIGURATION  ==============~~~~~
-# team name
+# replace REPLACEME with your team name!
 team_name="psyduck"
 # This variable dictates whether or not the bot is connecting to the prod
 # or test exchange. Be careful with this switch!
 test_mode = True
+
+num_order = 0
+orders = []
 
 # This setting changes which test exchange is connected to.
 # 0 is prod-like
@@ -27,8 +28,9 @@ prod_exchange_hostname="production"
 
 port=25000 + (test_exchange_index if test_mode else 0)
 exchange_hostname = "test-exch-" + team_name if test_mode else prod_exchange_hostname
-
-num_order = 0
+# exchange_hostname = 'test-exch-psyduck 20001'
+# port = 25001
+positions = {'BOND': 0, 'VALBZ': 0, 'VALE': 0, 'GS': 0, 'MS': 0, 'WFC': 0, 'XLF': 0}
 
 # ~~~~~============== NETWORKING CODE ==============~~~~~
 def connect():
@@ -45,14 +47,14 @@ def read_from_exchange(exchange):
 
 def bondProcesses(exchange):
     global num_order
-
+    global orders
     num_order+=1
-    write_to_exchange(exchange, {"type": "add", "order_id": order_no, "symbol": "BOND", "dir": "SELL", "price": 1002, "size": 10})
-
+    write_to_exchange(exchange, {"type": "add", "order_id": num_order, "symbol": "BOND", "dir": "SELL", "price": 1002, "size": 50})
+    orders.append(num_order)
     num_order+=1
-    write_to_exchange(exchange, {"type": "add", "order_id": order_no, "symbol": "BOND", "dir": "BUY", "price": 998, "size": 10})
+    write_to_exchange(exchange, {"type": "add", "order_id": num_order, "symbol": "BOND", "dir": "BUY", "price": 998, "size": 50})
+    orders.append(num_order)
 
-# ~~~~~============== MAIN LOOP ==============~~~~~
 def main():
     exchange = connect()
     write_to_exchange(exchange, {"type": "hello", "team": team_name.upper()})
@@ -64,27 +66,60 @@ def main():
     print("The exchange replied:", hello_from_exchange, file=sys.stderr)
     while True:
         message = read_from_exchange(exchange)
-        if (message["type"] == "close"):
+        if(message["type"] == "close"):
             print("The round has ended")
             break
-        elif (message["type"] == "book"):
-            symbol = message["symbol"]
-            print(symbol)
+        elif message['type']=='fill':
+            global num_order
+            global positions
+            symbol = message['symbol']
+            size = message['size']
+            direction = message['dir']
+            if direction == 'BUY':
+                positions[symbol] += size
+            elif direction == 'SELL':
+                positions[symbol] -= size
 
-            buy = message["buy"]
-            sell = message["sell"]
-            if (len(buy) == 0 or len(sell) == 0):
-                continue
+            if symbol == 'VALBZ' or symbol == 'VALE':
+                if positions[symbol] >= 10:
+                    if symbol == 'VALBZ':
+                        num_order += 1
+                        write_to_exchange(exchange, {"type": "convert", "order_id": num_order, "symbol": symbol, "dir": "BUY", "size": 10-positions['VALE']})
+                    elif symbol == "VALE":
+                        num_order += 1
+                        write_to_exchange(exchange, {"type": "convert", "order_id": num_order, "symbol": symbol, "dir": "BUY", "size": 10-positions['VALBZ']})
+        elif message["type"]=="BOOK" or message["type"]=="book":
+            if(message["symbol"] == "BOND"):
+                bondProcesses(exchange)
+                print("BOND PURCHASED/SOLD")
+            else:
+                symbol = message["symbol"]
+                print(symbol)
 
-            bid_price = buy[0][0]
-            bid_volume = buy[0][1]
-            ask_price = sell[0][0]
-            ask_volume = sell[0][1]
-            fair_price = (bid_price + ask_price) / 2
+                buy = message["buy"]
+                sell = message["sell"]
+                if (len(buy) == 0 or len(sell) == 0):
+                    continue
 
-            if (ask_price - bid_price >= 4):
-                write_to_exchange(exchange, {"type": "add", "order_id": num_order, "symbol": symbol, "dir": "BUY", "price": (bid_price + 1), "size": 10})
-                write_to_exchange(exchange, {"type": "add", "order_id": num_order, "symbol": symbol, "dir": "SELL", "price": (ask_price - 1), "size": 10})
+                bid_price = buy[0][0]
+                bid_volume = buy[0][1]
+                ask_price = sell[0][0]
+                ask_volume = sell[0][1]
+                fair_price = (bid_price + ask_price) / 2
+
+
+                if (ask_price - bid_price >= 4):
+                    global orders
+                    for i in range(len(orders)):
+                        write_to_exchange(exchange, {"type": "cancel", "order_id": orders[i]})
+                       #  print("Hell owlrd")
+                    global num_order
+                    num_order += 1
+                    write_to_exchange(exchange, {"type": "add", "order_id": num_order, "symbol": symbol, "dir": "BUY", "price": (bid_price + 1), "size": 10})
+                    orders.append(num_order)
+                    num_order += 1
+                    write_to_exchange(exchange, {"type": "add", "order_id": num_order, "symbol": symbol, "dir": "SELL", "price": (ask_price - 1), "size": 10})
+                    orders.append(num_order)
 
 if __name__ == "__main__":
     main()
