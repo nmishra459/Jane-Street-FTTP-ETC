@@ -2,4 +2,4 @@
 
 ***Team Psyduck***: Gildardo Banuelos (MIT), Katherine Yu (Stanford), and Nishant Mishra (Harvard)
 
-**Description**: A market trader bot (Python) that uses TCP connections (Bash) and standard trading practices to maximize profit/loss in a simulated financial exchange. Scripts leverage a known fair value of bonds, as well as discrepancies in the pricing of securities under the same underlying assets to generate a profit.
+**Description**: Programmed a market trader bot (Python) that utilized TCP connections (Bash), the known fair prices of bonds, and discrepancies in the pricing of securities under the same underlying assets to generate profit in a simulated financial exchange. Ranked in 8th place at Jane Street's 2021 FTTP Electronic Trading Challenge (ETC).
